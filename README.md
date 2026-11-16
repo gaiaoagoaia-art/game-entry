@@ -10,11 +10,11 @@ An entry for the make.fun bounty [best-game-01](https://make.fun/bounty/best-gam
 
 Pests are marching down a winding dirt path to eat the flower bed. You plant defenders on the lawn, spend sunlight, and turn back all **15 waves**.
 
-- **Four plants, four jobs** — Daisy Turret (fast single-target pollen shots), Thorn Vine (darts that slow), Bee Hive (splash bursts), Frost Fern (an area freeze). Every plant upgrades to level 2, and anything can be sold back.
-- **Five pests** — quick aphids, armoured beetles, tank slugs, fast wasps, and the Goliath Beetle, a crowned boss on the final wave.
+- **Four plants, four jobs** — Daisy Turret (fast single-target pollen shots), Thorn Vine (darts that slow), Bee Hive (splash bursts), Frost Fern (an area freeze). Every plant upgrades to level 2 and gains its own trick — the daisy shoots two pests at once, the vine's slow bites far harder, the hive's splash widens, the fern's freeze lasts far longer — and anything can be sold back.
+- **Six pests** — quick aphids, swarming garden ants, armoured beetles, tank slugs, fast wasps, and the Goliath Beetle, a crowned boss on the final wave. Pests grow tougher — and march a little faster — with every wave.
 - **Sunlight economy** — sun trickles in on its own, falls on the lawn as collectible drops, and every pest popped pays a bounty; clearing a wave pays a bonus.
-- **A complete loop** — title screen with instructions, HUD (sun, lives, wave, score, best), pause, 1×/2× speed, mute, victory and defeat screens with run stats, and one-click restart.
-- **Feel** — particles, hit flashes, floating score text, screen shake when the boss falls, wave banners, and a fully synthesised soundscape (no audio files).
+- **A complete loop** — title screen with instructions, HUD (sun, lives, wave, score, best), pause, 1×/2× speed, mute, victory (with a star rating) and defeat screens with run stats, and one-click restart.
+- **Feel** — particles, projectile trails, hit flashes, floating score text, screen shake when the boss falls, wave banners, and a fully synthesised soundscape with a soft music loop (no audio files).
 - **Controls** — mouse to plant, collect, upgrade and sell; keys 1–4 choose a plant, Space starts a wave, F toggles speed, P pauses, M mutes, R restarts.
 
 The simulation runs on a fixed 1/60 s step from a seeded random stream, so a seed always grows the same garden — which is also how the screenshots were staged: `game/index.html?shot=battle&seed=7` (also `title`, `boss`, `victory`) plays the real rules forward with a scripted gardener and raises `window.__shotReady` on the finished frame.
@@ -29,7 +29,7 @@ The simulation runs on a fixed 1/60 s step from a seeded random stream, so a see
   - `world.js` — the simulation: path, plants, pests, projectiles, waves, economy.
   - `render.js` — all canvas drawing: garden, plants, pests, HUD, toolbar, screens.
   - `input.js` — mouse and keyboard, in logical coordinates.
-  - `audio.js` — Web Audio sound effects, synthesised.
+  - `audio.js` — Web Audio sound effects and the music loop, synthesised.
   - `shots.js` — the deterministic screenshot scenes.
   - `main.js` — boot, the fixed-step loop, and the screen/interaction state machine.
 - `screenshots/` — four real renders of the game: battle (cover), title, the boss wave, victory.

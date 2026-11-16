@@ -11,8 +11,8 @@ import { BEST_KEY, GRID, STEP, TOWERS, TOWER_ORDER } from './config.js';
 import { createRandom } from './random.js';
 import { createAudio } from './audio.js';
 import {
-  createWorld, EVENT_BOSS_DOWN, EVENT_FREEZE, EVENT_KILL, EVENT_LEAK, EVENT_LOSE,
-  EVENT_SHOT, EVENT_SPLASH, EVENT_WAVE_CLEAR, EVENT_WIN,
+  createWorld, EVENT_BOSS_DOWN, EVENT_FREEZE, EVENT_HIT, EVENT_KILL, EVENT_LEAK,
+  EVENT_LOSE, EVENT_SHOT, EVENT_SPLASH, EVENT_THORN, EVENT_WAVE_CLEAR, EVENT_WIN,
 } from './world.js';
 import {
   ACTION_CONFIRM, ACTION_MUTE, ACTION_PAUSE, ACTION_RESTART, ACTION_SPEED, createInput,
@@ -81,6 +81,8 @@ function runGame() {
   let last = performance.now();
   let lastShotSound = 0;
   let lastPopSound = 0;
+  let lastThornSound = 0;
+  let lastHitSound = 0;
 
   function announce(message) {
     status.textContent = message;
@@ -120,6 +122,14 @@ function runGame() {
     if (events & EVENT_SHOT && now - lastShotSound > 75) {
       audio.shoot();
       lastShotSound = now;
+    }
+    if (events & EVENT_THORN && now - lastThornSound > 110) {
+      audio.thorn();
+      lastThornSound = now;
+    }
+    if ((events & EVENT_HIT) && !(events & EVENT_KILL) && now - lastHitSound > 85) {
+      audio.hit();
+      lastHitSound = now;
     }
     if (events & EVENT_SPLASH) audio.splash();
     if (events & EVENT_FREEZE && now - lastPopSound > 200) audio.freeze();

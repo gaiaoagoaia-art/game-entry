@@ -18,12 +18,12 @@ export const PATH_CELLS = [
   [-1, 1], [3, 1], [3, 5], [7, 5], [7, 2], [11, 2], [11, 6], [15, 6], [15, 3], [19, 3],
 ];
 
-export const START_SUN = 175;
+export const START_SUN = 160;
 export const START_LIVES = 20;
 export const TOTAL_WAVES = 15;
 
 /** Sunlight trickles in on its own, and a bigger drop lands on the lawn now and then to click. */
-export const INCOME = { perSecond: 0.9, dropEvery: [6, 10], dropValue: 25, dropLife: 9 };
+export const INCOME = { perSecond: 0.7, dropEvery: [6, 10], dropValue: 25, dropLife: 9 };
 
 /** The four plantable towers. Level 2 is bought per tower; see UPGRADE below. */
 export const TOWERS = {
@@ -53,16 +53,23 @@ export const SELL_SHARE = 0.7;
 /** The pests. Speed is pixels a second along the path; bounty is sunlight paid for a kill. */
 export const PESTS = {
   aphid: { name: 'Aphid', hp: 22, speed: 62, bounty: 3, score: 10, radius: 13, damage: 1 },
-  beetle: { name: 'Beetle', hp: 95, speed: 36, bounty: 5, score: 25, radius: 16, damage: 1 },
-  slug: { name: 'Slug', hp: 210, speed: 24, bounty: 7, score: 40, radius: 18, damage: 2 },
+  beetle: { name: 'Beetle', hp: 100, speed: 36, bounty: 5, score: 25, radius: 16, damage: 1 },
+  slug: { name: 'Slug', hp: 225, speed: 24, bounty: 7, score: 40, radius: 18, damage: 2 },
   wasp: { name: 'Wasp', hp: 34, speed: 96, bounty: 4, score: 20, radius: 13, damage: 1 },
-  boss: { name: 'Goliath Beetle', hp: 4200, speed: 21, bounty: 150, score: 1000, radius: 34, damage: 10 },
+  ant: { name: 'Garden Ant', hp: 15, speed: 118, bounty: 2, score: 15, radius: 11, damage: 1 },
+  boss: { name: 'Goliath Beetle', hp: 7800, speed: 21, bounty: 150, score: 1000, radius: 34, damage: 10 },
 };
 
 /** Enemy health grows by this factor each wave after the first, compounding gently. */
-export const WAVE_HP_GROWTH = 1.16;
+export const WAVE_HP_GROWTH = 1.23;
+/**
+ * Pests also march a little faster each wave. Health alone only lengthens a wave;
+ * speed is what turns a strong garden's surplus into leaks, above all for the fast
+ * kinds — it is the pressure that makes slows and freezes worth planting.
+ */
+export const WAVE_SPEED_GROWTH = 1.028;
 /** Seconds between one pest and the next inside a wave's groups. */
-export const SPAWN_GAP = 0.85;
+export const SPAWN_GAP = 0.72;
 
 /** Screen layout: the top HUD band and the bottom toolbar the renderer and input share. */
 export const LAYOUT = {

@@ -36,6 +36,14 @@ export function pointInRect(x, y, r) {
   return x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h;
 }
 
+/** What each plant's level 2 trick is, in the few words the info panel has room for. */
+export const LEVEL2_PERKS = {
+  daisy: 'shoots two pests at once',
+  thorn: 'a far stronger slow',
+  hive: 'a much wider splash',
+  fern: 'a far longer freeze',
+};
+
 export function createRenderer(canvas) {
   canvas.width = FIELD.width;
   canvas.height = FIELD.height;
@@ -369,6 +377,40 @@ export function createRenderer(canvas) {
       ctx.arc(r * 0.97, -r * 1.18, 2.6, 0, Math.PI * 2);
       ctx.arc(r * 0.52, -r * 1.24, 2.6, 0, Math.PI * 2);
       ctx.fill();
+    } else if (enemy.kind === 'ant') {
+      // A garden ant: three body segments strung along its line of march, six legs
+      // paddling, antennae up front. Small and quick — it reads as a scurrying dot.
+      const facing = enemy.dx || 1;
+      ctx.strokeStyle = flash ? '#a97e56' : '#5d3a1a';
+      ctx.lineWidth = 2;
+      for (let leg = -1; leg <= 1; leg += 1) {
+        const paddle = Math.sin(t * 26 + enemy.wobble + leg * 2.1) * r * 0.3;
+        ctx.beginPath();
+        ctx.moveTo(leg * r * 0.35, 0);
+        ctx.lineTo(leg * r * 0.35 + paddle * 0.4, r * 0.95);
+        ctx.moveTo(leg * r * 0.35, 0);
+        ctx.lineTo(leg * r * 0.35 - paddle * 0.4, -r * 0.95);
+        ctx.stroke();
+      }
+      ctx.fillStyle = flash ? '#d7b48c' : '#8d5a3a';
+      ctx.beginPath();
+      ctx.ellipse(-r * 0.62 * facing, 0, r * 0.52, r * 0.44, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.ellipse(0, 0, r * 0.36, r * 0.32, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = flash ? '#c49a6c' : '#6d4226';
+      ctx.beginPath();
+      ctx.arc(r * 0.55 * facing, 0, r * 0.34, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = flash ? '#c49a6c' : '#6d4226';
+      ctx.lineWidth = 1.6;
+      ctx.beginPath();
+      ctx.moveTo(r * 0.78 * facing, -r * 0.12);
+      ctx.quadraticCurveTo(r * 1.15 * facing, -r * 0.62, r * 1.3 * facing, -r * 0.5);
+      ctx.moveTo(r * 0.78 * facing, r * 0.12);
+      ctx.quadraticCurveTo(r * 1.15 * facing, r * 0.62, r * 1.3 * facing, r * 0.5);
+      ctx.stroke();
     } else if (enemy.kind === 'wasp') {
       const flap = Math.sin(t * 42 + enemy.wobble) * 0.7;
       ctx.fillStyle = 'rgba(255,255,255,0.8)';
@@ -548,7 +590,10 @@ export function createRenderer(canvas) {
       const t = ui.selected;
       const def = TOWERS[t.type];
       text(`${def.name} · Lv ${t.level}`, LAYOUT.infoX + 14, LAYOUT.cardY + 22, 17, PALETTE.ink, 'left', '800');
-      text(`Damage ${Math.round(t.damage)} · Range ${Math.round(t.range)}`, LAYOUT.infoX + 14, LAYOUT.cardY + 46, 14, PALETTE.mutedInk, 'left', '600');
+      text(t.level < 2
+        ? `Damage ${Math.round(t.damage)} · Range ${Math.round(t.range)} · Lv2: ${LEVEL2_PERKS[t.type]}`
+        : `Damage ${Math.round(t.damage)} · Range ${Math.round(t.range)} · Trick: ${LEVEL2_PERKS[t.type]}`,
+      LAYOUT.infoX + 14, LAYOUT.cardY + 46, 13.5, PALETTE.mutedInk, 'left', '600');
       if (t.level < 2) {
         const cost = ui.upgradeCost;
         ctx.fillStyle = state.sun >= cost ? '#7cb342' : '#bdb49c';
@@ -611,31 +656,70 @@ export function createRenderer(canvas) {
     const { x, y } = drawOverlayPanel(700, 470);
     text('🌼 Bloom Bastion 🌼', FIELD.width / 2, y + 62, 52, '#33691e', 'center', '800');
     text('A garden tower defence', FIELD.width / 2, y + 104, 21, PALETTE.mutedInk, 'center', '700');
+    // Two mascot daisies stand guard at the panel's top corners.
+    for (const mx of [x + 54, x + 646]) {
+      const mascot = { type: 'daisy', x: mx, y: y + 66, level: 1, angle: -Math.PI / 2, muzzle: 0, pulse: 0, sway: mx };
+      ctx.save();
+      ctx.translate(mx, y + 66);
+      ctx.scale(0.85, 0.85);
+      ctx.translate(-mx, -(y + 66));
+      drawTowerBody(mascot, state.time);
+      ctx.restore();
+    }
     const lines = [
       'Pests are marching down the path to eat your flower bed!',
       'Plant defenders on the lawn and stop all 15 waves.',
       '',
-      '🌻 Sunlight is money — it trickles in, falls as drops (click them!),',
-      '     and every pest you pop pays a bounty.',
+      '🌻 Sunlight is money — pop pests for bounty, click the falling drops!',
       '🌼 Daisy Turret — fast shots      🌵 Thorn Vine — slows pests',
       '🐝 Bee Hive — splash bursts      ❄ Frost Fern — freezes a crowd',
-      'Click a placed plant to upgrade it to level 2, or sell it back.',
+      '🐜 Garden Ants swarm in fast — slow them, splash them, freeze them.',
+      'Click a plant to upgrade it (level 2 gains a trick) or sell it.',
       '',
       'Keys: 1–4 plant · Space wave · F fast · P pause · M mute',
     ];
-    lines.forEach((line, i) => text(line, x + 56, y + 152 + i * 27, 17.5, PALETTE.ink, 'left', '600'));
+    lines.forEach((line, i) => text(line, x + 56, y + 150 + i * 25, 17.5, PALETTE.ink, 'left', '600'));
     ctx.fillStyle = '#7cb342';
     roundedRect(FIELD.width / 2 - 130, y + 396, 260, 50, 12);
     ctx.fill();
     text('Start defending ▶', FIELD.width / 2, y + 422, 21, '#ffffff', 'center', '800');
-    if (ui.best > 0) text(`Best score so far: ${ui.best}`, FIELD.width / 2, y + 396 - 24, 15, PALETTE.mutedInk, 'center', '700');
-    void state;
+    if (ui.best > 0) text(`Best score so far: ${ui.best}`, FIELD.width / 2, y + 128, 15, PALETTE.mutedInk, 'center', '700');
+  }
+
+  /** A five-pointed star, filled gold when earned and pale when not. */
+  function drawStar(cx, cy, r, earned) {
+    ctx.beginPath();
+    for (let i = 0; i < 10; i += 1) {
+      const rad = i % 2 === 0 ? r : r * 0.45;
+      const a = -Math.PI / 2 + (i * Math.PI) / 5;
+      const px = cx + Math.cos(a) * rad;
+      const py = cy + Math.sin(a) * rad;
+      if (i === 0) ctx.moveTo(px, py);
+      else ctx.lineTo(px, py);
+    }
+    ctx.closePath();
+    ctx.fillStyle = earned ? '#ffc107' : 'rgba(160, 150, 120, 0.35)';
+    ctx.fill();
+    ctx.strokeStyle = earned ? '#f5a623' : 'rgba(140, 130, 105, 0.4)';
+    ctx.lineWidth = 2;
+    ctx.stroke();
   }
 
   function drawEnd(state, ui, won) {
-    const { y } = drawOverlayPanel(620, 380);
+    // A won garden gets a taller panel: its star rating sits under the headline.
+    const lift = won ? 40 : 0;
+    const { y } = drawOverlayPanel(620, 380 + lift);
     text(won ? '🏆 The garden is safe!' : '🥀 The pests got the blooms…', FIELD.width / 2, y + 66, 38, won ? '#33691e' : '#8e3b2f', 'center', '800');
     text(won ? 'All 15 waves turned back. The flower bed blooms on!' : `The bed was overrun on wave ${state.wave} of ${TOTAL_WAVES}.`, FIELD.width / 2, y + 112, 18, PALETTE.mutedInk, 'center', '600');
+    if (won) {
+      // Stars for the state of the bed: three for a near-untouched garden.
+      const earned = state.lives >= 18 ? 3 : state.lives >= 10 ? 2 : 1;
+      for (let i = 0; i < 3; i += 1) {
+        drawStar(FIELD.width / 2 + (i - 1) * 56, y + 146, i === 1 ? 21 : 17, i < earned);
+      }
+    } else {
+      text('Tip: a Thorn Vine beside a Daisy Turret stops the fast ones cold.', FIELD.width / 2, y + 136, 14.5, PALETTE.mutedInk, 'center', '600');
+    }
     const rows = [
       ['Final score', String(state.score)],
       ['Best score', String(Math.max(ui.best, state.score))],
@@ -644,13 +728,13 @@ export function createRenderer(canvas) {
       ['Lives left', String(state.lives)],
     ];
     rows.forEach(([label, value], i) => {
-      text(label, FIELD.width / 2 - 150, y + 158 + i * 32, 18, PALETTE.ink, 'left', '600');
-      text(value, FIELD.width / 2 + 150, y + 158 + i * 32, 18, PALETTE.ink, 'right', '800');
+      text(label, FIELD.width / 2 - 150, y + 158 + lift + i * 32, 18, PALETTE.ink, 'left', '600');
+      text(value, FIELD.width / 2 + 150, y + 158 + lift + i * 32, 18, PALETTE.ink, 'right', '800');
     });
     ctx.fillStyle = '#7cb342';
-    roundedRect(FIELD.width / 2 - 120, y + 322, 240, 46, 12);
+    roundedRect(FIELD.width / 2 - 120, y + 322 + lift, 240, 46, 12);
     ctx.fill();
-    text('Play again ↺', FIELD.width / 2, y + 346, 20, '#ffffff', 'center', '800');
+    text('Play again ↺', FIELD.width / 2, y + 346 + lift, 20, '#ffffff', 'center', '800');
   }
 
   function draw(state, ui, world) {
@@ -707,8 +791,18 @@ export function createRenderer(canvas) {
     for (const tower of state.towers) drawTowerBody(tower, state.time);
     for (const enemy of state.enemies) drawEnemy(enemy, state.time);
 
-    // Projectiles.
+    // Projectiles, each with a short fading streak along the step it just travelled.
     for (const p of state.projectiles) {
+      if (p.px !== undefined && (p.px !== p.x || p.py !== p.y)) {
+        ctx.strokeStyle = p.kind === 'thorn' ? 'rgba(232, 245, 233, 0.55)'
+          : p.kind === 'hive' ? 'rgba(255, 202, 40, 0.5)' : 'rgba(255, 241, 118, 0.55)';
+        ctx.lineWidth = 2.4;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(p.px - (p.x - p.px) * 1.6, p.py - (p.y - p.py) * 1.6);
+        ctx.lineTo(p.x, p.y);
+        ctx.stroke();
+      }
       if (p.kind === 'thorn') {
         ctx.fillStyle = '#e8f5e9';
         ctx.beginPath();

@@ -6,7 +6,7 @@
 
 import {
   GRID, INCOME, PATH_CELLS, PESTS, SPAWN_GAP, START_LIVES, START_SUN, TOTAL_WAVES,
-  TOWERS, UPGRADE, SELL_SHARE, WAVE_HP_GROWTH,
+  TOWERS, UPGRADE, SELL_SHARE, WAVE_HP_GROWTH, WAVE_SPEED_GROWTH,
 } from './config.js';
 
 export const EVENT_SHOT = 1;
@@ -18,6 +18,8 @@ export const EVENT_WAVE_CLEAR = 32;
 export const EVENT_WIN = 64;
 export const EVENT_LOSE = 128;
 export const EVENT_BOSS_DOWN = 256;
+export const EVENT_THORN = 512;
+export const EVENT_HIT = 1024;
 
 /** Pixel position of the centre of a grid cell. */
 export function cellCentre(col, row) {
@@ -63,28 +65,37 @@ function buildPathCells() {
   return cells;
 }
 
-/** Each wave as groups of [pest kind, count]; groups march in with a pause between them. */
+/**
+ * Each wave as groups of [pest kind, count]; groups march in with a pause between them.
+ * Garden Ants debut on wave 4 and swarm in growing numbers from then on: individually
+ * frail, but the fastest thing on the path, so a garden without slows or splash leaks.
+ */
 const WAVE_RECIPES = [
   [['aphid', 8]],
   [['aphid', 10], ['aphid', 6]],
   [['aphid', 8], ['beetle', 3]],
-  [['aphid', 10], ['wasp', 3], ['aphid', 6]],
-  [['beetle', 5], ['aphid', 8]],
+  [['aphid', 8], ['ant', 6], ['aphid', 6]],
+  [['beetle', 5], ['aphid', 8], ['ant', 5]],
   [['wasp', 5], ['aphid', 10], ['beetle', 3]],
-  [['slug', 3], ['aphid', 10], ['beetle', 3]],
-  [['beetle', 6], ['wasp', 5]],
-  [['aphid', 16], ['slug', 3], ['wasp', 4]],
-  [['slug', 5], ['beetle', 5]],
-  [['wasp', 9], ['aphid', 12]],
-  [['beetle', 8], ['slug', 4], ['aphid', 10]],
-  [['wasp', 8], ['slug', 5], ['beetle', 5]],
-  [['aphid', 20], ['wasp', 8], ['slug', 4]],
-  [['beetle', 4], ['boss', 1], ['wasp', 6], ['slug', 3]],
+  [['slug', 3], ['aphid', 10], ['ant', 8]],
+  [['beetle', 6], ['wasp', 5], ['ant', 6]],
+  [['aphid', 16], ['slug', 3], ['wasp', 4], ['ant', 8]],
+  [['slug', 5], ['beetle', 5], ['ant', 10]],
+  [['wasp', 9], ['aphid', 12], ['ant', 8]],
+  [['beetle', 8], ['slug', 4], ['aphid', 10], ['ant', 10]],
+  [['wasp', 8], ['slug', 5], ['beetle', 5], ['ant', 12]],
+  [['aphid', 20], ['wasp', 8], ['slug', 4], ['ant', 14]],
+  [['beetle', 4], ['boss', 1], ['wasp', 6], ['slug', 3], ['ant', 10]],
 ];
 
 /** Health multiplier for a wave's pests: gentle compounding growth after the first wave. */
 function waveHpScale(wave) {
   return Math.pow(WAVE_HP_GROWTH, wave - 1);
+}
+
+/** Speed multiplier for a wave's pests: the march quickens a little every wave. */
+function waveSpeedScale(wave) {
+  return Math.pow(WAVE_SPEED_GROWTH, wave - 1);
 }
 
 export function createWorld(random) {
@@ -301,7 +312,7 @@ export function createWorld(random) {
     state.enemies.push({
       kind, hp, maxHp: hp,
       dist: 0, x: 0, y: 0, dx: 1, dy: 0,
-      speed: def.speed * random.range(0.9, 1.1),
+      speed: def.speed * waveSpeedScale(state.wave) * random.range(0.9, 1.1),
       slowT: 0, slowFactor: 0,
       freezeT: 0, flashT: 0,
       wobble: random.range(0, 6.28),
@@ -313,12 +324,13 @@ export function createWorld(random) {
   function damageEnemy(enemy, amount, events) {
     enemy.hp -= amount;
     enemy.flashT = 0.09;
-    if (enemy.hp > 0 || enemy.dead) return events;
+    if (enemy.dead) return events;
+    if (enemy.hp > 0) return events | EVENT_HIT;
     enemy.dead = true;
     state.kills += 1;
     state.sun += enemy.bounty;
     state.score += enemy.score;
-    const colors = { aphid: '#8bc34a', beetle: '#5d4037', slug: '#c5e1a5', wasp: '#fdd835', boss: '#4e342e' };
+    const colors = { aphid: '#8bc34a', beetle: '#5d4037', slug: '#c5e1a5', wasp: '#fdd835', ant: '#b07a4f', boss: '#4e342e' };
     burst(enemy.x, enemy.y, colors[enemy.kind], enemy.kind === 'boss' ? 46 : 12, enemy.kind === 'boss' ? 190 : 110, 0.6, 5, 140);
     floatText(enemy.x, enemy.y - enemy.radius - 6, `+${enemy.score}`, '#fff59d');
     if (enemy.kind === 'boss') {
@@ -329,13 +341,24 @@ export function createWorld(random) {
     return events | EVENT_KILL;
   }
 
+  /**
+   * A tower's shot, carrying everything its hit will do. Level 2 plants shoot with their
+   * trick folded in: a Bee Hive's burst is wider, and a Thorn Vine's dart slows harder
+   * and for longer (a Daisy Turret's trick — a second target — lives in the firing step).
+   * px/py trail one step behind x/y so the renderer can streak the shot's path.
+   */
   function fireProjectile(tower, target) {
+    const def = TOWERS[tower.type];
+    const grown = tower.level >= 2;
     state.projectiles.push({
       x: tower.x, y: tower.y - 16,
+      px: tower.x, py: tower.y - 16,
       target, speed: 430,
       damage: tower.damage,
       kind: tower.type,
-      splash: TOWERS[tower.type].splash ?? 0,
+      splash: def.splash ? def.splash * (grown ? 1.35 : 1) : 0,
+      slow: def.slow ? (grown ? 0.62 : def.slow) : 0,
+      slowTime: def.slowTime ? (grown ? 2.4 : def.slowTime) : 0,
     });
   }
 
@@ -391,6 +414,8 @@ export function createWorld(random) {
         enemy.escaped = true;
         state.lives -= enemy.damage;
         state.shake = Math.max(state.shake, enemy.kind === 'boss' ? 12 : 5);
+        burst(enemy.x - 16, enemy.y, '#ef5350', 10, 90, 0.5, 4, 60);
+        floatText(enemy.x - 34, enemy.y - 26, `-${enemy.damage} ♥`, '#ef9a9a');
         events |= EVENT_LEAK;
         if (state.lives <= 0) {
           state.lives = 0;
@@ -418,17 +443,30 @@ export function createWorld(random) {
       if (tower.type === 'fern') {
         tower.pulse = 0.35;
         ring(tower.x, tower.y, '#a5e8ff', tower.range);
+        // A level 2 fern's frost lingers: its freeze holds pests far longer.
+        const freezeTime = TOWERS.fern.freezeTime * (tower.level >= 2 ? 1.45 : 1);
         for (const enemy of state.enemies) {
           if (enemy.dead || enemy.escaped) continue;
           if (Math.hypot(enemy.x - tower.x, enemy.y - tower.y) <= tower.range) {
-            enemy.freezeT = Math.max(enemy.freezeT, TOWERS.fern.freezeTime);
+            enemy.freezeT = Math.max(enemy.freezeT, freezeTime);
             events = damageEnemy(enemy, tower.damage, events);
           }
         }
         events |= EVENT_FREEZE;
       } else {
         fireProjectile(tower, target);
+        // A level 2 Daisy Turret's trick: it also picks off the next pest in reach.
+        if (tower.type === 'daisy' && tower.level >= 2) {
+          let second = null;
+          for (const enemy of state.enemies) {
+            if (enemy === target || enemy.dead || enemy.escaped) continue;
+            const d = Math.hypot(enemy.x - tower.x, enemy.y - tower.y);
+            if (d <= tower.range && (second === null || enemy.dist > second.dist)) second = enemy;
+          }
+          if (second) fireProjectile(tower, second);
+        }
         events |= EVENT_SHOT;
+        if (tower.type === 'thorn') events |= EVENT_THORN;
       }
     }
 
@@ -454,13 +492,15 @@ export function createWorld(random) {
             events |= EVENT_SPLASH;
           } else {
             if (p.kind === 'thorn') {
-              p.target.slowT = Math.max(p.target.slowT, TOWERS.thorn.slowTime);
-              p.target.slowFactor = TOWERS.thorn.slow;
+              p.target.slowT = Math.max(p.target.slowT, p.slowTime);
+              p.target.slowFactor = p.slow;
             }
             events = damageEnemy(p.target, p.damage, events);
           }
         }
       } else {
+        p.px = p.x;
+        p.py = p.y;
         p.x += (dx / d) * move;
         p.y += (dy / d) * move;
       }
@@ -475,6 +515,11 @@ export function createWorld(random) {
       state.sun += bonus;
       state.score += state.wave * 15;
       floatText(640, 300, `Wave ${state.wave} cleared! +${bonus} sun`, '#fff59d');
+      // A little petal confetti over the lawn to celebrate.
+      const petalColors = ['#ff8a9e', '#ffd54f', '#ba68c8', '#fff59d'];
+      for (let i = 0; i < 3; i += 1) {
+        burst(random.range(240, 1040), random.range(160, 480), petalColors[i % petalColors.length], 12, 120, 0.9, 4.4, 150);
+      }
       events |= EVENT_WAVE_CLEAR;
       if (state.wave >= TOTAL_WAVES) {
         state.won = true;

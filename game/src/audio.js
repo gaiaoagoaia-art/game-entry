@@ -1,17 +1,21 @@
-// Synthesised sound effects with the Web Audio API — no audio files. A tiny voice plays
-// short oscillator blips and filtered noise at set pitches; the game calls the named effects
-// (shoot, hit, pop, coin, freeze, leak, win, lose) and never touches the context itself.
-// Sound starts on the first user gesture, as browsers require, and the mute toggle is kept here.
+// Synthesised sound with the Web Audio API — no audio files. A tiny voice plays short
+// oscillator blips and filtered noise at set pitches; the game calls the named effects
+// (shoot, thorn, hit, pop, coin, freeze, leak, win, lose) and never touches the context
+// itself, and a soft plucked melody loops underneath once sound is unlocked. Sound
+// starts on the first user gesture, as browsers require, and the mute toggle is kept here.
 
 export function createAudio() {
   let context = null;
   let master = null;
   let muted = false;
+  let musicTimer = null;
+  let musicStep = 0;
 
   /** Create the context lazily; safe to call on every gesture. */
   function unlock() {
     if (context) {
       if (context.state === 'suspended') context.resume();
+      startMusic();
       return;
     }
     const Ctor = window.AudioContext || window.webkitAudioContext;
@@ -20,6 +24,24 @@ export function createAudio() {
     master = context.createGain();
     master.gain.value = muted ? 0 : 0.35;
     master.connect(context.destination);
+    startMusic();
+  }
+
+  /**
+   * A very soft pentatonic pluck that loops under the play — two slow bars of melody
+   * over an occasional low root, quiet enough to sit behind the effects. It runs on
+   * the same master gain, so the mute toggle silences it with everything else.
+   */
+  function startMusic() {
+    if (musicTimer !== null) return;
+    const melody = [523.25, 659.25, 783.99, 659.25, 587.33, 783.99, 880, 783.99];
+    musicTimer = setInterval(() => {
+      if (!context || muted) return;
+      tone(melody[musicStep % melody.length], melody[musicStep % melody.length], 0.55, 'triangle', 0.045);
+      if (musicStep % 8 === 0) tone(261.63, 261.63, 0.9, 'sine', 0.04);
+      if (musicStep % 8 === 4) tone(196, 196, 0.9, 'sine', 0.04);
+      musicStep += 1;
+    }, 340);
   }
 
   /** One oscillator note: frequency glides from `from` to `to` over `seconds`. */
